@@ -3,6 +3,7 @@ name = "mclaw"
 version = "1.0.2"
 edition = "2021"
 description = "MClaw - OpenClaw Local Manager"
+license = "Apache-2.0"
 
 [[bin]]
 name = "mclaw"
