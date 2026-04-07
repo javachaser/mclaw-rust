@@ -29,12 +29,19 @@ use winit::{
     dpi::LogicalSize,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-    window::{UserAttentionType, Window, WindowId},
+    window::{Icon, UserAttentionType, Window, WindowId},
 };
 use wry::{WebView, WebViewBuilder};
 
 // ── Embedded frontend HTML ─────────────────────────────────────────────────────
 const INDEX_HTML: &str = include_str!("../assets/index.html");
+const APP_ICON_BYTES: &[u8] = include_bytes!("../assets/MClaw_Logo.png");
+
+fn load_window_icon() -> Option<Icon> {
+    let image = image::load_from_memory(APP_ICON_BYTES).ok()?.into_rgba8();
+    let (width, height) = image.dimensions();
+    Icon::from_rgba(image.into_raw(), width, height).ok()
+}
 
 // ── OpenClaw config ────────────────────────────────────────────────────────────
 const MCLAW_PORT: u16 = 19000;
@@ -721,7 +728,8 @@ impl DesktopApp {
         let window_attributes = Window::default_attributes()
             .with_title("OpenClaw 控制台")
             .with_inner_size(LogicalSize::new(1440.0, 920.0))
-            .with_min_inner_size(LogicalSize::new(1024.0, 720.0));
+            .with_min_inner_size(LogicalSize::new(1024.0, 720.0))
+            .with_window_icon(load_window_icon());
 
         let window = event_loop
             .create_window(window_attributes)
@@ -758,7 +766,8 @@ impl ApplicationHandler<AppUserEvent> for DesktopApp {
         let window_attributes = Window::default_attributes()
             .with_title("MClaw")
             .with_inner_size(LogicalSize::new(1280.0, 860.0))
-            .with_min_inner_size(LogicalSize::new(960.0, 680.0));
+            .with_min_inner_size(LogicalSize::new(960.0, 680.0))
+            .with_window_icon(load_window_icon());
 
         let window = event_loop
             .create_window(window_attributes)

@@ -8,6 +8,7 @@
 #define MyAppExeName "MClaw.exe"
 #define MyBuildDir "..\\target\\x86_64-pc-windows-gnu\\release"
 #define MyPayloadDir "payload"
+#define MyAppIcon "..\\assets\\MClaw.ico"
 #define WebView2Bootstrapper "MicrosoftEdgeWebview2Setup.exe"
 
 [Setup]
@@ -18,8 +19,10 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 DefaultDirName={localappdata}\Programs\MClaw
+DisableDirPage=no
 DefaultGroupName={#MyAppName}
-UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile={#MyAppIcon}
+UninstallDisplayIcon={app}\MClaw.ico
 OutputDir=..\dist
 OutputBaseFilename=MClaw-Setup-{#MyAppVersion}-x64
 Compression=lzma2
@@ -42,11 +45,12 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 [Files]
 Source: "{#MyBuildDir}\mclaw.exe"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
 Source: "{#MyBuildDir}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyPayloadDir}\{#WebView2Bootstrapper}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\MClaw.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\MClaw.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{tmp}\{#WebView2Bootstrapper}"; Parameters: "/silent /install"; StatusMsg: "正在安装 Microsoft WebView2 Runtime..."; Flags: waituntilterminated runhidden; Check: NeedsWebView2Runtime

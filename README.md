@@ -59,11 +59,14 @@ MClaw 由两部分组成：
 
 - `MClaw-Setup-1.0.2-x64.exe`
 
-安装程序会将应用安装到：
+安装程序默认会把应用安装到：
 
 - `{localappdata}\Programs\MClaw`
 
+安装过程中可以改成你自己选择的目录。
+
 如果系统尚未安装 WebView2 Runtime，安装程序会自动尝试安装。
+
 
 ### 方式二：从源码运行
 
@@ -110,7 +113,9 @@ powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
 ```text
 mclaw-rust/
 ├─ assets/
-│  └─ index.html              # 内嵌前端界面
+│  ├─ index.html              # 内嵌前端界面
+│  ├─ MClaw_Logo.png          # 应用 logo 原图
+│  └─ MClaw.ico               # Windows 安装器与快捷方式图标
 ├─ installer/
 │  ├─ build-installer.ps1     # 安装包构建脚本
 │  ├─ MClaw.iss               # Inno Setup 脚本
@@ -139,7 +144,7 @@ MClaw 内置的本地服务主要提供以下接口：
 
 ## 当前实现说明
 
-当前版本更偏向“面向本机既有 OpenClaw 环境的管理器”，也就是说：
+当前版本更偏向"面向本机既有 OpenClaw 环境的管理器"，也就是说：
 
 - 默认依赖本机 OpenClaw 的既定安装与配置位置
 - 主要面向 Windows 本地使用场景
