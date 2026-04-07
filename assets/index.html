@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MClaw — OpenClaw 管理器</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --green: #3fb950;
+  --green-bg: #0f2519;
+  --green-border: #1a4628;
+  --red: #f85149;
+  --red-bg: #2d0f0e;
+  --red-border: #4a1b19;
+  --yellow: #d29922;
+  --yellow-bg: #2c2209;
+  --yellow-border: #4d3d0a;
+  --blue: #58a6ff;
+  --blue-bg: #0c1e33;
+  --blue-border: #1e3a5c;
+  --purple: #bc8cff;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+}
+
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Layout ───────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -0.3px; }
+.logo-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: #fff; font-weight: 900;
+}
+.logo-name { color: var(--text); }
+.logo-sub { color: var(--text-muted); font-size: 13px; font-weight: 400; margin-left: 4px; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.last-refresh { color: var(--text-muted); font-size: 12px; }
+
+main { flex: 1; padding: 28px; max-width: 960px; width: 100%; margin: 0 auto; }
+
+/* ── Cards ────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* ── Status Badge ─────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.badge-dot { width: 7px; height: 7px; border-radius: 50%; }
+.badge-green { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
+.badge-green .badge-dot { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+.badge-red { background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red); }
+.badge-red .badge-dot { background: var(--red); }
+.badge-yellow { background: var(--yellow-bg); border: 1px solid var(--yellow-border); color: var(--yellow); }
+.badge-yellow .badge-dot { background: var(--yellow); animation: pulse 1s infinite; }
+.badge-gray { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); }
+.badge-gray .badge-dot { background: var(--text-muted); }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Big Status Display ───────────────────────────────────── */
+.status-hero { display: flex; align-items: center; gap: 20px; padding: 10px 0 4px; }
+.status-icon-wrap {
+  width: 64px; height: 64px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; flex-shrink: 0;
+}
+.status-icon-wrap.running { background: var(--green-bg); border: 1px solid var(--green-border); }
+.status-icon-wrap.stopped { background: var(--red-bg); border: 1px solid var(--red-border); }
+.status-icon-wrap.checking { background: var(--yellow-bg); border: 1px solid var(--yellow-border); }
+.status-icon-wrap.not-installed { background: var(--surface2); border: 1px solid var(--border); }
+
+.status-info h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.status-info p { color: var(--text-muted); font-size: 13px; }
+
+/* ── Stat Grid ────────────────────────────────────────────── */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px; margin-top: 16px;
+}
+.stat-item {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+}
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 15px; font-weight: 600; color: var(--text); word-break: break-all; }
+.stat-value.mono { font-family: 'Consolas', 'SF Mono', monospace; font-size: 13px; }
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-value.blue { color: var(--blue); }
+.stat-value.muted { color: var(--text-muted); }
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer; transition: all 0.15s;
+  text-decoration: none; white-space: nowrap;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.btn-primary { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+.btn-primary:hover:not(:disabled) { background: #1a4628; border-color: var(--green); }
+.btn-danger { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+.btn-danger:hover:not(:disabled) { background: #4a1b19; border-color: var(--red); }
+.btn-default { background: var(--surface2); border-color: var(--border); color: var(--text); }
+.btn-default:hover:not(:disabled) { background: #2d333a; border-color: #8b949e; }
+.btn-blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+.btn-blue:hover:not(:disabled) { background: #1e3a5c; border-color: var(--blue); }
+
+.btn-loading .spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Install Check ────────────────────────────────────────── */
+.install-checks { display: flex; flex-direction: column; gap: 10px; }
+.check-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.check-item-label { flex: 1; font-size: 13px; color: var(--text); }
+.check-item-status { font-size: 12px; font-weight: 600; }
+.check-ok { color: var(--green); }
+.check-fail { color: var(--red); }
+
+/* ── Model Panel ──────────────────────────────────────────── */
+.provider-block { margin-bottom: 20px; }
+.provider-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 10px;
+  background: var(--blue-bg); border: 1px solid var(--blue-border); border-radius: var(--radius-sm);
+}
+.provider-name { font-size: 14px; font-weight: 700; color: var(--blue); }
+.provider-url { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+
+.model-grid { display: flex; flex-direction: column; gap: 8px; }
+.model-item {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+}
+.model-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.model-name { font-size: 14px; font-weight: 600; color: var(--blue); font-family: 'Consolas', monospace; }
+.model-alias { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.model-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.model-tag {
+  font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+}
+.model-tag.green { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+.model-tag.blue { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+.model-tag.purple { background: #1e1033; border-color: #4a2c8a; color: var(--purple); }
+.model-stats { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+.model-stat { font-size: 12px; color: var(--text-muted); }
+.model-stat span { color: var(--text); font-weight: 600; }
+
+/* ── Auth panel ───────────────────────────────────────────── */
+.auth-item {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 16px; margin-bottom: 8px;
+}
+.auth-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.auth-value { font-size: 13px; font-family: monospace; color: var(--text); word-break: break-all; }
+
+/* ── Config / Log ─────────────────────────────────────────── */
+.config-block {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px 16px; font-family: 'Consolas', 'SF Mono', monospace; font-size: 12px;
+  color: var(--text-muted); white-space: pre-wrap; word-break: break-all;
+  max-height: 360px; overflow-y: auto; line-height: 1.7;
+}
+
+/* ── Toast ────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 11px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5); animation: slideIn 0.2s ease;
+  max-width: 380px; border: 1px solid transparent;
+}
+.toast-success { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
+.toast-error { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+.toast-info { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab-btn {
+  padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--text-muted);
+  border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--blue); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Misc ─────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.empty-state { text-align: center; padding: 32px 20px; color: var(--text-muted); font-size: 13px; }
+.empty-state .emoji { font-size: 32px; margin-bottom: 8px; }
+.link { color: var(--blue); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+.inline-code {
+  font-family: 'Consolas', monospace; font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 6px; color: var(--purple);
+}
+.section-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">M</div>
+      <span class="logo-name">MClaw</span>
+      <span class="logo-sub">OpenClaw 管理器</span>
+    </div>
+    <div class="header-actions">
+      <span class="last-refresh" id="last-refresh-text">--</span>
+      <button class="btn btn-default" onclick="refreshAll()">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+        刷新
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('overview')">概览</button>
+      <button class="tab-btn" onclick="switchTab('install')">安装检测</button>
+      <button class="tab-btn" onclick="switchTab('models')">模型信息</button>
+      <button class="tab-btn" onclick="switchTab('config')">配置</button>
+    </div>
+
+    <!-- ── Tab: Overview ── -->
+    <div class="tab-panel active" id="tab-overview">
+
+      <!-- Status Card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+            服务状态
+          </span>
+          <span id="status-badge" class="badge badge-gray"><span class="badge-dot"></span>检测中...</span>
+        </div>
+
+        <div class="status-hero">
+          <div class="status-icon-wrap checking" id="status-icon">⏳</div>
+          <div class="status-info">
+            <h2 id="status-title">正在检测...</h2>
+            <p id="status-desc">请稍等，正在获取服务状态</p>
+          </div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-label">端口</div>
+            <div class="stat-value mono" id="stat-port">18789</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">版本</div>
+            <div class="stat-value" id="stat-version">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">进程 PID</div>
+            <div class="stat-value mono" id="stat-pid">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">健康检查</div>
+            <div class="stat-value" id="stat-health">--</div>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-start" onclick="startService()" disabled>
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
+            启动服务
+          </button>
+          <button class="btn btn-danger" id="btn-stop" onclick="stopService()" disabled>
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5z"/></svg>
+            停止服务
+          </button>
+          <button class="btn btn-blue" id="btn-open" onclick="openConsole()" disabled>
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+            打开控制台
+          </button>
+          <button class="btn btn-default" onclick="refreshAll()">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+            刷新状态
+          </button>
+        </div>
+      </div>
+
+      <!-- Access Info -->
+      <div class="card" id="access-card" style="display:none">
+        <div class="card-header">
+          <span class="card-title">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.674a6.958 6.958 0 0 0-.656 2.5h2.49zM4.847 5a12.5 12.5 0 0 0-.338 2.5H7.5V5H4.847zM8.5 5v2.5h2.99a12.495 12.495 0 0 0-.337-2.5H8.5zM4.51 8.5a12.5 12.5 0 0 0 .337 2.5H7.5V8.5H4.51zm3.99 0V11h2.653c.187-.765.306-1.608.338-2.5H8.5zM5.145 12c.138.386.295.744.468 1.068.552 1.035 1.218 1.65 1.887 1.855V12H5.145zm.182 2.472a6.696 6.696 0 0 1-.597-.933A9.268 9.268 0 0 1 4.09 12H2.255a7.024 7.024 0 0 0 3.072 2.472zM3.82 11a13.652 13.652 0 0 1-.312-2.5h-2.49c.062.89.291 1.733.656 2.5H3.82zm6.853 3.472A7.024 7.024 0 0 0 13.745 12H11.91a9.27 9.27 0 0 1-.64 1.539 6.688 6.688 0 0 1-.597.933zM8.5 12v2.923c.67-.204 1.335-.82 1.887-1.855.173-.324.33-.682.468-1.068H8.5zm3.68-1h2.146c.365-.767.594-1.61.656-2.5h-2.49a13.65 13.65 0 0 1-.312 2.5zm2.802-3.5a6.959 6.959 0 0 0-.656-2.5H12.18c.174.782.282 1.623.312 2.5h2.49zM11.27 2.461c.247.464.462.98.64 1.539h1.835a7.024 7.024 0 0 0-3.072-2.472c.218.284.418.598.597.933zM10.855 4a7.966 7.966 0 0 0-.468-1.068C9.835 1.897 9.17 1.282 8.5 1.077V4h2.355z"/></svg>
+            访问地址
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <a id="access-link" href="#" target="_blank" onclick="handleAccessLink(event)" class="link" style="font-family:monospace;font-size:13px">--</a>
+          <button class="btn btn-default" style="padding:5px 12px;font-size:12px" onclick="copyAccessUrl()">复制链接</button>
+          <span style="font-size:12px;color:var(--text-muted)">（已含 Token，点击直接进入）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Install Check ── -->
+    <div class="tab-panel" id="tab-install">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">安装检测</span>
+          <button class="btn btn-default" style="padding:5px 12px;font-size:12px" onclick="loadDetect()">重新检测</button>
+        </div>
+        <div class="install-checks" id="install-checks">
+          <div class="empty-state"><div class="emoji">🔍</div>正在检测...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Models ── -->
+    <div class="tab-panel" id="tab-models">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">模型信息</span>
+          <button class="btn btn-default" style="padding:5px 12px;font-size:12px" onclick="loadModels()">刷新</button>
+        </div>
+        <div id="models-content">
+          <div class="empty-state"><div class="emoji">🤖</div>点击刷新获取模型信息</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Config ── -->
+    <div class="tab-panel" id="tab-config">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">运行配置</span>
+          <button class="btn btn-default" style="padding:5px 12px;font-size:12px" onclick="loadConfig()">刷新</button>
+        </div>
+        <div id="config-content">
+          <div class="empty-state"><div class="emoji">⚙️</div>点击刷新加载配置</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let state = { status: null };
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function api(method, path, timeout = 25000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    const res = await fetch(path, { method, signal: ctrl.signal });
+    clearTimeout(tid);
+    return await res.json();
+  } catch (e) {
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+  el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0'; el.style.transition = 'opacity 0.3s';
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${name}'`));
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === `tab-${name}`);
+  });
+  if (name === 'install') loadDetect();
+  else if (name === 'models') loadModels();
+  else if (name === 'config') loadConfig();
+}
+
+// ── Render status ─────────────────────────────────────────────────────────────
+function renderStatus(data) {
+  state.status = data;
+
+  const badge = document.getElementById('status-badge');
+  const icon = document.getElementById('status-icon');
+  const title = document.getElementById('status-title');
+  const desc = document.getElementById('status-desc');
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  const btnOpen = document.getElementById('btn-open');
+  const accessCard = document.getElementById('access-card');
+
+  document.getElementById('stat-port').textContent = data.port || '18789';
+  document.getElementById('stat-version').textContent = data.version ? 'v' + data.version : '--';
+  document.getElementById('stat-pid').textContent = data.pid || '--';
+
+  if (!data.installed) {
+    badge.className = 'badge badge-gray';
+    badge.innerHTML = '<span class="badge-dot"></span>未安装';
+    icon.className = 'status-icon-wrap not-installed'; icon.textContent = '📦';
+    title.textContent = '未检测到 OpenClaw';
+    desc.textContent = '未在本机找到 openclaw npm 包，请先安装';
+    document.getElementById('stat-health').textContent = '--';
+    document.getElementById('stat-health').className = 'stat-value muted';
+    btnStart.disabled = true; btnStop.disabled = true; btnOpen.disabled = true;
+    accessCard.style.display = 'none';
+    return;
+  }
+
+  if (data.healthy) {
+    badge.className = 'badge badge-green';
+    badge.innerHTML = '<span class="badge-dot"></span>运行中';
+    icon.className = 'status-icon-wrap running'; icon.textContent = '🟢';
+    title.textContent = '服务正常运行';
+    desc.textContent = `OpenClaw Gateway 正在运行，端口 ${data.port}`;
+    document.getElementById('stat-health').textContent = '✓ 健康';
+    document.getElementById('stat-health').className = 'stat-value green';
+    btnStart.disabled = true; btnStop.disabled = false; btnOpen.disabled = false;
+    accessCard.style.display = 'block';
+    const link = document.getElementById('access-link');
+    link.href = data.accessUrl; link.textContent = data.accessUrl;
+  } else if (data.portOpen) {
+    badge.className = 'badge badge-yellow';
+    badge.innerHTML = '<span class="badge-dot"></span>启动中';
+    icon.className = 'status-icon-wrap checking'; icon.textContent = '⏳';
+    title.textContent = '服务启动中...';
+    desc.textContent = '端口已监听，等待健康检查通过';
+    document.getElementById('stat-health').textContent = '等待中';
+    document.getElementById('stat-health').className = 'stat-value muted';
+    btnStart.disabled = true; btnStop.disabled = false; btnOpen.disabled = true;
+    accessCard.style.display = 'none';
+  } else {
+    badge.className = 'badge badge-red';
+    badge.innerHTML = '<span class="badge-dot"></span>已停止';
+    icon.className = 'status-icon-wrap stopped'; icon.textContent = '🔴';
+    title.textContent = '服务未运行';
+    desc.textContent = '点击"启动服务"按钮启动 OpenClaw Gateway';
+    document.getElementById('stat-health').textContent = '离线';
+    document.getElementById('stat-health').className = 'stat-value red';
+    btnStart.disabled = false; btnStop.disabled = true; btnOpen.disabled = true;
+    accessCard.style.display = 'none';
+  }
+}
+
+// ── Load status ───────────────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res = await api('GET', '/api/status', 10000);
+    if (res.success) renderStatus(res.data);
+    const now = new Date();
+    document.getElementById('last-refresh-text').textContent =
+      `上次刷新: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  } catch (e) {
+    toast('获取状态失败: ' + e.message, 'error');
+  }
+}
+
+// ── Load detect ───────────────────────────────────────────────────────────────
+async function loadDetect() {
+  const container = document.getElementById('install-checks');
+  container.innerHTML = '<div class="empty-state"><div class="emoji">🔍</div>检测中...</div>';
+  try {
+    const res = await api('GET', '/api/detect', 8000);
+    if (!res.success) { container.innerHTML = `<div class="empty-state">检测失败</div>`; return; }
+    const d = res.data;
+    const items = [
+      { label: 'Node.js 运行环境', ok: d.nodeExists, detail: 'C:\\Program Files\\nodejs\\node.exe' },
+      { label: 'OpenClaw npm 包', ok: d.packageExists, detail: d.version ? `版本 v${d.version}` : '未安装' },
+      { label: '主配置文件', ok: d.configExists, detail: 'C:/soft/openclaw/config/openclaw.json' },
+      { label: '模型配置文件', ok: d.modelsFileExists, detail: 'C:/soft/openclaw/config/agents/main/agent/models.json' },
+    ];
+    container.innerHTML = items.map(item => `
+      <div class="check-item">
+        <div style="font-size:18px">${item.ok ? '✅' : '❌'}</div>
+        <div class="check-item-label">
+          <strong>${item.label}</strong>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-family:monospace">${item.detail}</div>
+        </div>
+        <div class="check-item-status ${item.ok ? 'check-ok' : 'check-fail'}">${item.ok ? '已就绪' : '未找到'}</div>
+      </div>
+    `).join('');
+    const allOk = d.nodeExists && d.packageExists && d.configExists;
+    container.innerHTML += `
+      <div style="padding:12px 14px;background:${allOk ? 'var(--green-bg)' : 'var(--yellow-bg)'};border:1px solid ${allOk ? 'var(--green-border)' : 'var(--yellow-border)'};border-radius:var(--radius-sm);font-size:13px;color:${allOk ? 'var(--green)' : 'var(--yellow)'}">
+        ${allOk ? '✓ OpenClaw 已完整安装，可以正常启动服务' : '⚠ 部分组件未就绪，请检查上方项目'}
+      </div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state">检测失败: ${e.message}</div>`;
+  }
+}
+
+// ── Load models ───────────────────────────────────────────────────────────────
+async function loadModels() {
+  const container = document.getElementById('models-content');
+  container.innerHTML = '<div class="empty-state"><div class="emoji">⏳</div>加载中...</div>';
+  try {
+    const res = await api('GET', '/api/models', 8000);
+    if (!res.success) {
+      container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div>${res.message || '无法获取模型信息'}</div>`;
+      return;
+    }
+
+    const data = res.data;
+    const auth = res.auth;
+    const providers = data.providers || {};
+
+    let html = '';
+
+    // Service status indicator
+    html += `<div style="margin-bottom:14px;font-size:12px;color:var(--text-muted)">
+      服务状态: <span style="color:${res.serviceRunning ? 'var(--green)' : 'var(--red)'}">
+        ${res.serviceRunning ? '● 运行中' : '● 已停止'}
+      </span>
+      &nbsp;&nbsp;数据来源: <span class="inline-code">models.json</span>
+    </div>`;
+
+    // Auth profiles
+    if (auth && auth.profiles) {
+      html += `<div class="section-title">认证配置</div>`;
+      for (const [name, profile] of Object.entries(auth.profiles)) {
+        const isDefault = auth.defaultProfile === name;
+        html += `<div class="auth-item" style="margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${name}</span>
+            ${isDefault ? '<span class="model-tag green">默认</span>' : ''}
+            <span class="model-tag blue">${profile.type || 'apiKey'}</span>
+          </div>
+          <div class="auth-label">API Key</div>
+          <div class="auth-value">${profile.credentials?.apiKey || '--'}</div>
+        </div>`;
+      }
+      html += '<div class="divider"></div>';
+    }
+
+    // Providers & Models
+    const providerEntries = Object.entries(providers);
+    if (providerEntries.length === 0) {
+      html += '<div class="empty-state"><div class="emoji">🤖</div>暂无提供商配置</div>';
+    } else {
+      html += `<div class="section-title">模型提供商 (${providerEntries.length} 个)</div>`;
+      for (const [providerName, providerData] of providerEntries) {
+        const models = providerData.models || [];
+        html += `<div class="provider-block">
+          <div class="provider-header">
+            <div>
+              <div class="provider-name">${providerName}</div>
+              <div class="provider-url">${providerData.baseUrl || ''} &nbsp;·&nbsp; API: ${providerData.api || '--'}</div>
+            </div>
+            <span class="model-tag blue">${models.length} 个模型</span>
+          </div>
+          <div class="model-grid">
+            ${models.map(m => {
+              const inputTypes = (m.input || []).join(', ');
+              const ctxK = m.contextWindow ? Math.round(m.contextWindow / 1000) + 'K' : '--';
+              const maxTK = m.maxTokens ? Math.round(m.maxTokens / 1000) + 'K' : '--';
+              return `<div class="model-item">
+                <div class="model-item-header">
+                  <span class="model-name">${m.id || '--'}</span>
+                  <div style="display:flex;gap:5px">
+                    ${m.reasoning ? '<span class="model-tag purple">推理</span>' : ''}
+                    <span class="model-tag">${inputTypes}</span>
+                  </div>
+                </div>
+                ${m.name && m.name !== m.id ? `<div class="model-alias">${m.name}</div>` : ''}
+                <div class="model-stats">
+                  <div class="model-stat">上下文: <span>${ctxK}</span></div>
+                  <div class="model-stat">最大输出: <span>${maxTK}</span></div>
+                  ${(m.cost && m.cost.input === 0 && m.cost.output === 0) ? '<div class="model-stat" style="color:var(--green)">免费</div>' : ''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="emoji">❌</div>加载失败: ${e.message}</div>`;
+  }
+}
+
+// ── Load config ───────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const container = document.getElementById('config-content');
+  container.innerHTML = '<div class="empty-state"><div class="emoji">⏳</div>加载中...</div>';
+  try {
+    const res = await api('GET', '/api/config', 8000);
+    if (!res.success) { container.innerHTML = `<div class="empty-state">${res.message}</div>`; return; }
+    container.innerHTML = `<div class="config-block">${JSON.stringify(res.data, null, 2)}</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+  }
+}
+
+// ── Start service ─────────────────────────────────────────────────────────────
+async function startService() {
+  const btn = document.getElementById('btn-start');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin">⟳</span> 启动中...`;
+  toast('正在启动 OpenClaw 服务，请稍候（最长 20 秒）...', 'info', 22000);
+  try {
+    const res = await api('POST', '/api/start', 25000);
+    if (res.success) {
+      toast(res.alreadyRunning ? '服务已在运行' : '服务启动成功！', 'success');
+    } else {
+      toast('启动失败: ' + res.message, 'error', 6000);
+    }
+  } catch (e) {
+    toast('启动请求异常: ' + e.message, 'error', 6000);
+  } finally {
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>启动服务`;
+    await loadStatus();
+  }
+}
+
+// ── Stop service ──────────────────────────────────────────────────────────────
+async function stopService() {
+  if (!confirm('确认停止 OpenClaw Gateway 服务吗？')) return;
+  const btn = document.getElementById('btn-stop');
+  btn.disabled = true;
+  toast('正在停止服务...', 'info');
+  try {
+    const res = await api('POST', '/api/stop', 10000);
+    if (res.success) {
+      toast(res.alreadyStopped ? '服务已停止' : `服务已停止 (PID: ${res.pid})`, 'success');
+    } else {
+      toast('停止失败: ' + res.message, 'error', 5000);
+    }
+  } catch (e) {
+    toast('停止请求异常: ' + e.message, 'error');
+  } finally {
+    await loadStatus();
+  }
+}
+
+// ── Open console ──────────────────────────────────────────────────────────────
+function handleAccessLink(event) {
+  if (window.ipc && typeof window.ipc.postMessage === 'function') {
+    event.preventDefault();
+    openConsole();
+  }
+}
+
+function openConsole() {
+  if (state.status && state.status.accessUrl) {
+    const url = state.status.accessUrl;
+    if (window.ipc && typeof window.ipc.postMessage === 'function') {
+      window.ipc.postMessage(JSON.stringify({ kind: 'open_console', url }));
+    } else {
+      window.open(url, '_blank');
+    }
+  } else {
+    toast('服务访问地址未就绪', 'error');
+  }
+}
+
+// ── Copy URL ───────────────────────────────────────────────────────────────────
+function copyAccessUrl() {
+  if (state.status && state.status.accessUrl) {
+    navigator.clipboard.writeText(state.status.accessUrl)
+      .then(() => toast('链接已复制到剪贴板', 'success'))
+      .catch(() => toast('复制失败，请手动复制', 'error'));
+  }
+}
+
+// ── Refresh all ───────────────────────────────────────────────────────────────
+function refreshAll() {
+  loadStatus();
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (activePanel) {
+    if (activePanel.id === 'tab-install') loadDetect();
+    else if (activePanel.id === 'tab-models') loadModels();
+    else if (activePanel.id === 'tab-config') loadConfig();
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadStatus();
+setInterval(loadStatus, 15000);
+</script>
+</body>
+</html>
